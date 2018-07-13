@@ -17,6 +17,20 @@ function Crawler(config) {
 
   // 对入口url进行解析
   this.parsedEntry = url.parse(this.config.entry);
+  /*
+  this.next = function (opt, res, next) {
+    const middlewares = this.middlewares;
+    if (opt.middlewaresIndex >= middlewares.length) {
+      // this.middlewaresIndex = 0;
+      return;
+    }
+    const fun = middlewares[opt.middlewaresIndex++];
+
+    // fun.apply(this, [url, res, next.bind(this, url, res, next)]);
+    fun.apply(this, [opt, res, next.bind(this, next)]);
+
+
+  };*/
 
 }
 
@@ -29,6 +43,10 @@ Crawler.prototype.init = function () {
   // 准备访问的列表
   this.viewList = [];
   this.viewList.push(config.entry);
+
+
+  // 中间件index
+  this.middlewaresIndex = 0;
 
 
   // 同时访问多少条链接
@@ -60,13 +78,21 @@ Crawler.prototype.crawl = async function () {
 
 
     const promise = new Promise((resolve, reject) => {
-      console.log(url)
+      // console.log(url)
       axios.get(url, {
         headers
       }).then(function (res) {
 
         // 遍历相关的爬虫用例
-        
+
+
+        const opt = {
+          entryUrl: url,
+          middlewaresIndex: 0
+        }
+        let next = self.nextFactory.bind(self, opt, res)
+        next = next.bind(self, next);
+        next()
 
         // 解析html
         const $ = cheerio.load(res.data)
@@ -116,6 +142,17 @@ Crawler.prototype.crawl = async function () {
 
 }
 
+Crawler.prototype.nextFactory = function (opt, res, next) {
+  const middlewares = this.middlewares;
+  if (opt.middlewaresIndex >= middlewares.length) {
+    // this.middlewaresIndex = 0;
+    return;
+  }
+  const fun = middlewares[opt.middlewaresIndex++];
+
+  // fun.apply(this, [url, res, next.bind(this, url, res, next)]);
+  fun.apply(this, [opt, res, next.bind(this, next)]);
+}
 
 // 是不是需要访问的目标链接
 Crawler.prototype.isTargetUrl = function (link) {
